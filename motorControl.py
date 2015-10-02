@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 # -*- coding: utf-8 -*-
 
-import sys, glob, serial
+import sys, glob, serial, re
 from PyQt5.QtWidgets import (QWidget, QLabel, 
     QComboBox, QApplication, QPushButton)
 from PyQt5.QtCore import (Qt, pyqtSignal, QObject, QSize, QPoint, 
@@ -12,6 +12,7 @@ from random import randint
 
 class Communication(QObject):
     """docstring for Communication"""
+    serial = serial.Serial()
     def __init__(self, baud):
         super().__init__()
         self.baud = baud
@@ -49,13 +50,19 @@ class Communication(QObject):
         self.serial = serial.Serial(port, self.baud)
         if not self.serial.isOpen():
             self.serial.open()
-        print(str(self.serial.isOpen()))
+            self.serial.flushInput()
+        
 
     def randomAngle():
         return randint(0,360)
 
     def read(self):
-        return Communication.randomAngle()
+        text = ''
+        if self.serial.isOpen():
+            if self.serial.inWaiting() > 0:
+                text = self.serial.read(self.serial.inWaiting())
+                print(text)
+        return text
 
 class MotorControl(QObject):
     """docstring for MotorControl"""
@@ -84,7 +91,19 @@ class MotorControl(QObject):
 
     def read(self):
         angle = self.com.read()
-        self.interface.setAngle(angle)
+        if angle:
+            s = angle.decode().strip('\n\r')
+            print ("decode",s)
+            re.findall('OK', s)
+            print ("re",s)
+            s = s.split('\n')
+            print ("split",s)
+            if s != '' and s != ' ':
+                for next in s:
+                    print(next)
+                    if next != '':
+                        next = int(next)
+                        self.interface.setAngle(next)
         self.timer.start(1000)
 
 class Interface(QWidget):
@@ -101,7 +120,6 @@ class Interface(QWidget):
         self.lbl.move(10, 150)
         
         self.combo = QComboBox(self)
-        self.addPorts()
         self.combo.move(10, 10)
         self.combo.activated[str].connect(self.onActivated)
         
@@ -114,7 +132,10 @@ class Interface(QWidget):
 
         self.setGeometry(300, 300, 300, 300)
         self.setWindowTitle('Motor Controller')
+
+        self.combo.addItem("Connect/Refresh")
         self.show()
+        self.addPorts()
 
     def refreshClicked(self):
         self.refresh.emit()
@@ -131,6 +152,7 @@ class Interface(QWidget):
         # self.removeWidget(combo)
         # self.combo.deleteLater()
         # self.combo = QComboBox(self)
+        self.combo.clear()
         for next in self.ports:
             self.combo.addItem(next)
     
@@ -142,7 +164,7 @@ class Interface(QWidget):
         self.positionGraph.setAngle(angle)
 
 class AnalogPosition(QWidget):
-    angle = 0
+
     positionHand = QPolygon([
         QPoint(7, 8),
         QPoint(-7, 8),
@@ -156,6 +178,8 @@ class AnalogPosition(QWidget):
 
         self.setWindowTitle("Position")
         self.resize(300, 300)
+        self.angle = 0.1
+
     def mousePressEvent(self, event):
         self.angle = AnalogPosition.randomAngle()
         print(event.pos(), "Angle: ", self.angle)
@@ -174,6 +198,7 @@ class AnalogPosition(QWidget):
 
         painter.save()
         painter.rotate(self.angle)
+
         painter.drawConvexPolygon(AnalogPosition.positionHand)
         painter.restore()
 
