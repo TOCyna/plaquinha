@@ -1,27 +1,27 @@
 /* Blink without Delay
- 
- Turns on and off a light emitting diode(LED) connected to a digital  
+
+ Turns on and off a light emitting diode(LED) connected to a digital
  pin, without using the delay() function.  This means that other code
  can run at the same time without being interrupted by the LED code.
- 
+
  The circuit:
  * LED attached from pin 13 to ground.
  * Note: on most Arduinos, there is already an LED on the board
  that's attached to pin 13, so no hardware is needed for this example.
- 
- 
+
+
  created 2005
  by David A. Mellis
  modified 8 Feb 2010
  by Paul Stoffregen
- 
+
  This example code is in the public domain.
 
- 
+
  http://www.arduino.cc/en/Tutorial/BlinkWithoutDelay
  */
 
-// constants won't change. Used here to 
+// constants won't change. Used here to
 // set pin numbers:
 const int ledPin =  13;      // the number of the LED pin
 
@@ -31,40 +31,75 @@ long previousMillis = 0;        // will store last time LED was updated
 
 // the follow variables is a long because the time, measured in miliseconds,
 // will quickly become a bigger number than can be stored in an int.
-long interval = 200;           // interval at which to blink (milliseconds)
+long interval = 500;           // interval at which to blink (milliseconds)
 int n = 0;
+int aux = 0;
+int com = 0;
+bool flag = 0;
+String inString = "";
 
 void setup() {
   // set the digital pin as output:
   Serial.begin(9600);
-  Serial.println("OK");
-  pinMode(ledPin, OUTPUT);      
+  pinMode(ledPin, OUTPUT);
 }
 
 void loop()
 {
-  // here is where you'd put code that needs to be running all the time.
-
-  // check to see if it's time to blink the LED; that is, if the 
-  // difference between the current time and last time you blinked 
-  // the LED is bigger than the interval at which you want to 
-  // blink the LED.
   unsigned long currentMillis = millis();
- 
-  if(currentMillis - previousMillis > interval) {
-    // save the last time you blinked the LED 
-    previousMillis = currentMillis;   
+  while (Serial.available() > 0) {
+    int inChar = Serial.read();
+    char a = (char)inChar;
+    if (a == 'a') {
+      Serial.flush();
+      inString = "";
+      com = 0;
+    }
+    if (isDigit(inChar)) {
+      // convert the incoming byte to a char
+      // and add it to the string:
+      inString += (char)inChar;
+    }
+    // if you get a newline, print the string,
+    // then the string's value:
+    if (inChar == 'c') {
+      com = inString.toInt();
+      if (com == 111) {
+        flag = 1;
+      } else if (com == 101) {
+        flag = 0;
+      } else if (com == 100) {
+        printAngle();
+      } else if (com >= 200 && com < 560) {
+        n = com - 200;
+        if (ledState == LOW)
+          ledState = HIGH;
+        else
+          ledState = LOW;
+      }
+      com = 0;
+      // clear the string for new input:
+      inString = "";
+    }
+  }
+  if (currentMillis - previousMillis > interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
 
     // if the LED is off turn it on and vice-versa:
-    if (ledState == LOW)
-      ledState = HIGH;
-    else
-      ledState = LOW;
+
 
     // set the LED with the ledState of the variable:
     digitalWrite(ledPin, ledState);
-    n = (n + 1) % 360;
-    Serial.println(n);
+    if (flag) {
+      printAngle();
+    }
   }
+}
+
+void printAngle(void) {
+  n = (n + 1) % 360;
+  String s = String(n);
+  Serial.println('a' + s + 'c');
 }
 
