@@ -47,11 +47,10 @@ void setup() {
 void loop()
 {
   unsigned long currentMillis = millis();
-  while (Serial.available() > 0) {
+  if (Serial.available()) {
     int inChar = Serial.read();
     char a = (char)inChar;
     if (a == 'a') {
-      Serial.flush();
       inString = "";
       com = 0;
     }
@@ -70,7 +69,7 @@ void loop()
         flag = 0;
       } else if (com == 100) {
         printAngle();
-      } else if (com >= 200 && com < 560) {
+      } else if (com >= 200 && com <= 560) {
         n = com - 200;
         if (ledState == LOW)
           ledState = HIGH;
@@ -99,7 +98,6 @@ void loop()
 }
 
 void printAngle(void) {
-  n = (n) % 360;
   String s = String(n);
   Serial.println('a' + s + 'c');
 }

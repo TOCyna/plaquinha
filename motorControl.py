@@ -14,6 +14,7 @@ class Communication(QObject):
     """docstring for Communication"""
     serial = serial.Serial()
     connected = pyqtSignal(bool)
+    text = ''
     def __init__(self, baud):
         super().__init__()
         self.baud = baud
@@ -59,16 +60,20 @@ class Communication(QObject):
         return randint(0,360)
 
     def read(self):
-        text = ''
         if self.serial.isOpen():
-            if self.serial.inWaiting() > 0:
-                text = self.serial.read(self.serial.inWaiting())
-                print(text)
-        return text
-    
+            while self.serial.inWaiting(): 
+                char = self.serial.read(1).decode()
+                if char == 'a':
+                    self.text = ''
+                elif char.isdigit():
+                    self.text += char
+                elif char == 'c':
+                    return self.text
+        return ''
+
     def write(self,angle):
         if self.serial.isOpen():
-            text = "a" + str(angle+200) + "c"
+            text = "a" + str(angle + 200) + "c"
             self.serial.write(text.encode())
 
 class MotorControl(QObject):
@@ -90,7 +95,7 @@ class MotorControl(QObject):
         
         self.timer = QTimer()
         self.timer.timeout.connect(self.read)
-        self.timer.start(5)
+        self.timer.start(3)
 
         sys.exit(app.exec_())
 
@@ -102,20 +107,8 @@ class MotorControl(QObject):
     def read(self):
         angle = self.com.read()
         if angle:
-            print(angle)
-        #     s = angle.decode().strip('\n\r')
-        #     print ("decode",s)
-        #     re.findall('OK', s)
-        #     print ("re",s)
-        #     s = s.split('\n')
-        #     print ("split",s)
-        #     if s != '' and s != ' ':
-        #         for next in s:
-        #             print(next)
-        #             if next != '':
-        #                 next = int(next)
-        #                 self.interface.setAngle(next)
-        self.timer.start(100)
+            self.interface.setAngle(int(angle))
+        self.timer.start(3)
 
 class Interface(QWidget):
     ports = []
@@ -128,9 +121,6 @@ class Interface(QWidget):
         self.initUI()
 
     def initUI(self):      
-        self.lbl = QLabel("Select a COM", self)
-        self.lbl.move(10, 180)
-        
         self.combo = QComboBox(self)
         self.combo.move(10, 10)
         self.combo.activated[str].connect(self.onActivated)
@@ -142,13 +132,17 @@ class Interface(QWidget):
         # sld = QSlider(Qt.Horizontal, self)
         # sld.setFocusPolicy(Qt.NoFocus)
         # sld.setGeometry(30, 40, 150, 30)
-        # sld.setRange(0,360)
+
         sld = QDial(self)
+        sld.setRange(0,360)
         sld.move(10, 70)
         sld.valueChanged[int].connect(self.changeValue)
+        
+        self.motorAngle = QLabel("Angle: 000", self)
+        self.motorAngle.move(120, 110)
 
-        self.positionGraph = AnalogPosition()
-        self.positionGraph.show()
+        self.status = QLabel("Select a COM", self)
+        self.status.move(10, 180)
 
         self.setGeometry(200, 200, 200, 200)
         self.setWindowTitle('Motor Control')
@@ -157,13 +151,18 @@ class Interface(QWidget):
         self.show()
         self.addPorts()
 
+        self.positionGraph = AnalogPosition()
+        self.positionGraph.show()
+
+   
     def isConnected(self, connected):
         if connected:
-            self.lbl.setText("Connected")
+            self.status.setText("Connected")
         else:
-            self.lbl.setText("Disconnected - Refresh and select a COM")
+            self.status.setText("Disconnected - Refresh and select a COM")
 
     def changeValue(self, value):
+        print ("Send: ", value)
         self.angle.emit(value)
 
     def refreshClicked(self):
@@ -174,8 +173,8 @@ class Interface(QWidget):
         # ser = serial.Serial(text, 9600)
         # if not ser.isOpen():
         #     ser.open()
-        # self.lbl.setText(str(ser.isOpen()))
-        # self.lbl.adjustSize()
+        # self.status.setText(str(ser.isOpen()))
+        # self.status.adjustSize()
     
     def addPorts(self):
         # self.removeWidget(combo)
@@ -190,6 +189,7 @@ class Interface(QWidget):
         self.addPorts()
 
     def setAngle(self, angle):
+        self.motorAngle.setText("Angle: " + str(angle))
         self.positionGraph.setAngle(angle)
 
 class AnalogPosition(QWidget):
@@ -210,8 +210,8 @@ class AnalogPosition(QWidget):
         self.angle = 0.1
 
     def mousePressEvent(self, event):
-        self.angle = AnalogPosition.randomAngle()
-        print(event.pos(), "Angle: ", self.angle)
+        # self.angle = AnalogPosition.randomAngle()
+        # print(event.pos(), "Angle: ", self.angle)
         self.update()
     
     def paintEvent(self, event):
