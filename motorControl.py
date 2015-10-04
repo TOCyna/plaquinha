@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 import sys, glob, serial, re
 from PyQt5.QtWidgets import (QWidget, QLabel, 
-    QComboBox, QApplication, QPushButton)
+    QComboBox, QApplication, QPushButton, QSlider)
 from PyQt5.QtCore import (Qt, pyqtSignal, QObject, QSize, QPoint, 
     QTime, QTimer)
 from PyQt5.QtGui import QColor, QPainter, QPolygon
@@ -13,6 +13,7 @@ from random import randint
 class Communication(QObject):
     """docstring for Communication"""
     serial = serial.Serial()
+    connected = pyqtSignal(bool)
     def __init__(self, baud):
         super().__init__()
         self.baud = baud
@@ -51,7 +52,8 @@ class Communication(QObject):
         if not self.serial.isOpen():
             self.serial.open()
             self.serial.flushInput()
-        
+        if self.serial.isOpen:
+            self.connected.emit(True)
 
     def randomAngle():
         return randint(0,360)
@@ -63,6 +65,11 @@ class Communication(QObject):
                 text = self.serial.read(self.serial.inWaiting())
                 print(text)
         return text
+    
+    def write(self,angle):
+        if self.serial.isOpen():
+            text = "a" + str(angle+200) + "c"
+            self.serial.write(text.encode())
 
 class MotorControl(QObject):
     """docstring for MotorControl"""
@@ -75,12 +82,15 @@ class MotorControl(QObject):
         app = QApplication(sys.argv)
         
         self.interface = Interface(ports)
+
+        self.com.connected[bool].connect(self.interface.isConnected)
         self.interface.selectedPort[str].connect(self.com.connect)
         self.interface.refresh.connect(self.refreshPorts)
+        self.interface.angle[int].connect(self.com.write)
         
         self.timer = QTimer()
         self.timer.timeout.connect(self.read)
-        self.timer.start(1000)
+        self.timer.start(5)
 
         sys.exit(app.exec_())
 
@@ -92,32 +102,34 @@ class MotorControl(QObject):
     def read(self):
         angle = self.com.read()
         if angle:
-            s = angle.decode().strip('\n\r')
-            print ("decode",s)
-            re.findall('OK', s)
-            print ("re",s)
-            s = s.split('\n')
-            print ("split",s)
-            if s != '' and s != ' ':
-                for next in s:
-                    print(next)
-                    if next != '':
-                        next = int(next)
-                        self.interface.setAngle(next)
-        self.timer.start(1000)
+            print(angle)
+        #     s = angle.decode().strip('\n\r')
+        #     print ("decode",s)
+        #     re.findall('OK', s)
+        #     print ("re",s)
+        #     s = s.split('\n')
+        #     print ("split",s)
+        #     if s != '' and s != ' ':
+        #         for next in s:
+        #             print(next)
+        #             if next != '':
+        #                 next = int(next)
+        #                 self.interface.setAngle(next)
+        self.timer.start(100)
 
 class Interface(QWidget):
     ports = []
     selectedPort = pyqtSignal(str)
     refresh = pyqtSignal()
+    angle = pyqtSignal(int)
     def __init__(self, ports):
         super().__init__()
         self.ports = ports
         self.initUI()
 
     def initUI(self):      
-        self.lbl = QLabel("Select COM", self)
-        self.lbl.move(10, 150)
+        self.lbl = QLabel("Select a COM", self)
+        self.lbl.move(10, 100)
         
         self.combo = QComboBox(self)
         self.combo.move(10, 10)
@@ -127,15 +139,32 @@ class Interface(QWidget):
         refresh.move(10, 40)
         refresh.clicked.connect(self.refreshClicked)
         
+
+        sld = QSlider(Qt.Horizontal, self)
+        sld.setFocusPolicy(Qt.NoFocus)
+        sld.setGeometry(30, 40, 150, 30)
+        sld.setRange(0,360)
+        sld.move(10, 70)
+        sld.valueChanged[int].connect(self.changeValue)
+
         self.positionGraph = AnalogPosition()
         self.positionGraph.show()
 
-        self.setGeometry(300, 300, 300, 300)
-        self.setWindowTitle('Motor Controller')
+        self.setGeometry(200, 150, 200, 150)
+        self.setWindowTitle('Motor Control')
 
         self.combo.addItem("Connect/Refresh")
         self.show()
         self.addPorts()
+
+    def isConnected(self, connected):
+        if connected:
+            self.lbl.setText("Connected")
+        else:
+            self.lbl.setText("Disconnected - Refresh and select a COM")
+
+    def changeValue(self, value):
+        self.angle.emit(value)
 
     def refreshClicked(self):
         self.refresh.emit()

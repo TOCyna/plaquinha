@@ -76,6 +76,7 @@ void loop()
           ledState = HIGH;
         else
           ledState = LOW;
+        printAngle();
       }
       com = 0;
       // clear the string for new input:
@@ -98,7 +99,7 @@ void loop()
 }
 
 void printAngle(void) {
-  n = (n + 1) % 360;
+  n = (n) % 360;
   String s = String(n);
   Serial.println('a' + s + 'c');
 }
