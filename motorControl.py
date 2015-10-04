@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 import sys, glob, serial, re
 from PyQt5.QtWidgets import (QWidget, QLabel, 
-    QComboBox, QApplication, QPushButton, QSlider)
+    QComboBox, QApplication, QPushButton, QSlider, QDial)
 from PyQt5.QtCore import (Qt, pyqtSignal, QObject, QSize, QPoint, 
     QTime, QTimer)
 from PyQt5.QtGui import QColor, QPainter, QPolygon
@@ -129,7 +129,7 @@ class Interface(QWidget):
 
     def initUI(self):      
         self.lbl = QLabel("Select a COM", self)
-        self.lbl.move(10, 100)
+        self.lbl.move(10, 180)
         
         self.combo = QComboBox(self)
         self.combo.move(10, 10)
@@ -139,18 +139,18 @@ class Interface(QWidget):
         refresh.move(10, 40)
         refresh.clicked.connect(self.refreshClicked)
         
-
-        sld = QSlider(Qt.Horizontal, self)
-        sld.setFocusPolicy(Qt.NoFocus)
-        sld.setGeometry(30, 40, 150, 30)
-        sld.setRange(0,360)
+        # sld = QSlider(Qt.Horizontal, self)
+        # sld.setFocusPolicy(Qt.NoFocus)
+        # sld.setGeometry(30, 40, 150, 30)
+        # sld.setRange(0,360)
+        sld = QDial(self)
         sld.move(10, 70)
         sld.valueChanged[int].connect(self.changeValue)
 
         self.positionGraph = AnalogPosition()
         self.positionGraph.show()
 
-        self.setGeometry(200, 150, 200, 150)
+        self.setGeometry(200, 200, 200, 200)
         self.setWindowTitle('Motor Control')
 
         self.combo.addItem("Connect/Refresh")
