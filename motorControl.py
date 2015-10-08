@@ -15,6 +15,7 @@ class Communication(QObject):
     serial = serial.Serial()
     connected = pyqtSignal(bool)
     text = ''
+    null = 999
     def __init__(self, baud):
         super().__init__()
         self.baud = baud
@@ -52,24 +53,29 @@ class Communication(QObject):
         self.serial = serial.Serial(port, self.baud)
         if not self.serial.isOpen():
             self.serial.open()
-            self.serial.flushInput()
         if self.serial.isOpen:
-            self.connected.emit(True)
+            self.serial.flushInput()
+            self.serial.write("a111c".encode())
 
     def randomAngle():
         return randint(0,360)
 
     def read(self):
         if self.serial.isOpen():
-            while self.serial.inWaiting(): 
-                char = self.serial.read(1).decode()
+            while self.serial.inWaiting():
+                char = self.serial.read(1)
+                if char:
+                    char = char.decode()
                 if char == 'a':
                     self.text = ''
                 elif char.isdigit():
                     self.text += char
                 elif char == 'c':
-                    return self.text
-        return ''
+                    if self.text == '111':
+                        self.connected.emit(True)
+                    else:
+                        return (int(self.text)-200)
+        return self.null
 
     def write(self,angle):
         if self.serial.isOpen():
@@ -95,7 +101,7 @@ class MotorControl(QObject):
         
         self.timer = QTimer()
         self.timer.timeout.connect(self.read)
-        self.timer.start(3)
+        self.timer.start(2)
 
         sys.exit(app.exec_())
 
@@ -106,9 +112,11 @@ class MotorControl(QObject):
 
     def read(self):
         angle = self.com.read()
-        if angle:
-            self.interface.setAngle(int(angle))
-        self.timer.start(3)
+        # 999 é lixo
+        if angle != Communication.null:
+            print("R: " + str(angle))
+            self.interface.setAngle(angle)
+        self.timer.start(2)
 
 class Interface(QWidget):
     ports = []
