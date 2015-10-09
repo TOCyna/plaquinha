@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 //alocao dos pinos
 const int EN = 10; // pino de enable do L293d
 const int IN1 = 11; // pino A1 de direcao do L293D
@@ -16,7 +18,7 @@ const int LED = 13;
 //global consts
 const int MIN_ANGLE = 0;
 const int MAX_ANGLE = 240;
-const int MIN_POWER = 60;
+const int MIN_POWER = 100; // original 60
 const int MAX_POWER = 255;
 const int MIN_ENCODER = 0;
 const int MAX_ENCODER = 1022;
@@ -29,16 +31,19 @@ const int OFFSET_COM = 200;
 const int MOTOR_FREE = 0;
 const int MOTOR_STOP = 220;
 
-//variaveis de controle
+//variaveis de comunicacao
 String inString = "";
 bool isHearing = 0;
 int input = 0;
 int com = 0;
 int lastPrintedAngle = 0;
 
-//variaveis do digital input
+//variaveis de controle
 int selectAngle[5];
 int selectMode[3];
+
+// variaveis da eeprom
+int EEPROM_ADDR = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -64,8 +69,20 @@ void setup() {
 
 void loop()
 {
-  serialRead();
-  goToDegree(input);
+  pinsRead();
+  if(selectMode[0]==0){ // automatico
+    int degree;
+    degree= binTodegree();
+    Serial.print("degree selected: ");
+    Serial.println(degree);
+    goToDegree(degree);
+    
+  }
+  if(selectMode[0]==1){ //manual
+    serialRead();  
+    goToDegree(input);
+    //goToDegree(240);    
+  } 
 }
 
 void serialRead() {
@@ -88,6 +105,7 @@ void serialRead() {
         digitalWrite(LED, HIGH);
       } else if (com == 101) {
         isHearing = 0; //Desabilita o envio Serial (CloseConection)
+        input = -1;
         digitalWrite(LED, LOW);
       } else if (com == 100) {
         realMeanPosition();
@@ -102,6 +120,30 @@ void serialRead() {
     }
   }
 }
+//le todas as entradas de controle
+void pinsRead(void) {
+  selectMode[0]=digitalRead(SELECT);
+  //selectMode[1]=digitalRead(NULL1);
+  //selectMode[2]=digitalRead(NULL2);
+  selectAngle[0]=digitalRead(LSB);
+  selectAngle[1]=digitalRead(B2);
+  selectAngle[2]=digitalRead(B3);
+  selectAngle[3]=digitalRead(B4);
+  selectAngle[4]=digitalRead(MSB);  
+}
+
+int binTodegree(){
+int decimal=0;
+  for (int i=0; i<5;i++){ 
+    if((selectAngle[i]*(pow(2,i)))>2){
+      decimal+=1;
+    }
+    decimal+= (selectAngle[i]*(pow(2,i)));
+  }
+  int degree= decimal*7.74; //   360/31 = 11.61   ou 240/31 = 7.74
+  return degree;   
+}
+
 //Envia mensagem dentro do protocolo
 void printAngle(void) {
   String s = String((realMeanPosition() + OFFSET_COM));
@@ -166,6 +208,10 @@ int realMeanPosition(){
 
 void goToDegree(int degree) {
   if(degree >= MIN_ANGLE && degree <= MAX_ANGLE) {
+    
+    EEPROM.write(EEPROM_ADDR, degree); 
+    degree = EEPROM.read(EEPROM_ADDR);
+    
     int realPosition, distance, factorOfOcilation;
 
     realPosition = realMeanPosition();
