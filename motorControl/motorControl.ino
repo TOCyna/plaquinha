@@ -18,7 +18,7 @@ const int LED = 13;
 //global consts
 const int MIN_ANGLE = 0;
 const int MAX_ANGLE = 240;
-const int MIN_POWER = 100; // original 60
+const int MIN_POWER = 120; // original 60
 const int MAX_POWER = 255;
 const int MIN_ENCODER = 0;
 const int MAX_ENCODER = 1022;
@@ -34,7 +34,7 @@ const int MOTOR_STOP = 220;
 //variaveis de comunicacao
 String inString = "";
 bool isHearing = 0;
-int input = 0;
+int input;
 int com = 0;
 int lastPrintedAngle = 0;
 
@@ -64,6 +64,7 @@ void setup() {
   pinMode(ENCODER, INPUT); 
   pinMode(LED, OUTPUT);
   CONST_ENCODER = (float)MAX_ANGLE / (float)MAX_ENCODER;
+  input = EEPROM.read(EEPROM_ADDR);
   //debug
 }
 
@@ -73,8 +74,8 @@ void loop()
   if(selectMode[0]==0){ // automatico
     int degree;
     degree= binTodegree();
-    Serial.print("degree selected: ");
-    Serial.println(degree);
+    //Serial.print("degree selected: ");
+    //Serial.println(degree);
     goToDegree(degree);
     
   }
@@ -112,7 +113,8 @@ void serialRead() {
       } else {
         com = com - OFFSET_COM;
         if (com >= MIN_ANGLE && com <= MAX_ANGLE) {
-          input = com;
+          input = com;          
+          EEPROM.write(EEPROM_ADDR,input); 
         }
       }
       com = 0; //Limpa para receber proxima mensagem
@@ -133,12 +135,9 @@ void pinsRead(void) {
 }
 
 int binTodegree(){
-int decimal=0;
+  int decimal=0;
   for (int i=0; i<5;i++){ 
-    if((selectAngle[i]*(pow(2,i)))>2){
-      decimal+=1;
-    }
-    decimal+= (selectAngle[i]*(pow(2,i)));
+    decimal+= (selectAngle[i]*(1<<i));
   }
   int degree= decimal*7.74; //   360/31 = 11.61   ou 240/31 = 7.74
   return degree;   
@@ -207,17 +206,15 @@ int realMeanPosition(){
 
 
 void goToDegree(int degree) {
+  
   if(degree >= MIN_ANGLE && degree <= MAX_ANGLE) {
-    
-    EEPROM.write(EEPROM_ADDR, degree); 
-    degree = EEPROM.read(EEPROM_ADDR);
-    
+          
     int realPosition, distance, factorOfOcilation;
 
     realPosition = realMeanPosition();
     
-    while((realPosition < (degree - ERRO)) ||
-           (realPosition > (degree + ERRO))) {
+    while((realPosition < (degree - ERRO)) || (realPosition > (degree + ERRO))) {
+      digitalWrite(LED, LOW);
       distance = realPosition - degree;
       if(distance < 0)
         goClockWise(abs(distance));
@@ -226,6 +223,7 @@ void goToDegree(int degree) {
       realPosition = realMeanPosition();
     }
   }
+  digitalWrite(LED, HIGH);
   motorStop();
 }
 
