@@ -1,5 +1,3 @@
-#include <EEPROM.h>
-
 //alocao dos pinos
 const int EN = 10; // pino de enable do L293d
 const int IN1 = 11; // pino A1 de direcao do L293D
@@ -18,7 +16,7 @@ const int LED = 13;
 //global consts
 const int MIN_ANGLE = 0;
 const int MAX_ANGLE = 240;
-const int MIN_POWER = 120; // original 60
+const int MIN_POWER = 60;
 const int MAX_POWER = 255;
 const int MIN_ENCODER = 0;
 const int MAX_ENCODER = 1022;
@@ -31,19 +29,16 @@ const int OFFSET_COM = 200;
 const int MOTOR_FREE = 0;
 const int MOTOR_STOP = 220;
 
-//variaveis de comunicacao
+//variaveis de controle
 String inString = "";
 bool isHearing = 0;
-int input;
+int input = 0;
 int com = 0;
 int lastPrintedAngle = 0;
 
-//variaveis de controle
+//variaveis do digital input
 int selectAngle[5];
 int selectMode[3];
-
-// variaveis da eeprom
-int EEPROM_ADDR = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -64,26 +59,13 @@ void setup() {
   pinMode(ENCODER, INPUT); 
   pinMode(LED, OUTPUT);
   CONST_ENCODER = (float)MAX_ANGLE / (float)MAX_ENCODER;
-  input = EEPROM.read(EEPROM_ADDR);
   //debug
 }
 
 void loop()
 {
-  pinsRead();
-  if(selectMode[0]==0){ // automatico
-    int degree;
-    degree= binTodegree();
-    //Serial.print("degree selected: ");
-    //Serial.println(degree);
-    goToDegree(degree);
-    
-  }
-  if(selectMode[0]==1){ //manual
-    serialRead();  
-    goToDegree(input);
-    //goToDegree(240);    
-  } 
+  serialRead();
+  goToDegree(input);
 }
 
 void serialRead() {
@@ -106,15 +88,13 @@ void serialRead() {
         digitalWrite(LED, HIGH);
       } else if (com == 101) {
         isHearing = 0; //Desabilita o envio Serial (CloseConection)
-        input = -1;
         digitalWrite(LED, LOW);
       } else if (com == 100) {
         realMeanPosition();
       } else {
         com = com - OFFSET_COM;
         if (com >= MIN_ANGLE && com <= MAX_ANGLE) {
-          input = com;          
-          EEPROM.write(EEPROM_ADDR,input); 
+          input = com;
         }
       }
       com = 0; //Limpa para receber proxima mensagem
@@ -122,27 +102,6 @@ void serialRead() {
     }
   }
 }
-//le todas as entradas de controle
-void pinsRead(void) {
-  selectMode[0]=digitalRead(SELECT);
-  //selectMode[1]=digitalRead(NULL1);
-  //selectMode[2]=digitalRead(NULL2);
-  selectAngle[0]=digitalRead(LSB);
-  selectAngle[1]=digitalRead(B2);
-  selectAngle[2]=digitalRead(B3);
-  selectAngle[3]=digitalRead(B4);
-  selectAngle[4]=digitalRead(MSB);  
-}
-
-int binTodegree(){
-  int decimal=0;
-  for (int i=0; i<5;i++){ 
-    decimal+= (selectAngle[i]*(1<<i));
-  }
-  int degree= decimal*7.74; //   360/31 = 11.61   ou 240/31 = 7.74
-  return degree;   
-}
-
 //Envia mensagem dentro do protocolo
 void printAngle(void) {
   String s = String((realMeanPosition() + OFFSET_COM));
@@ -206,15 +165,13 @@ int realMeanPosition(){
 
 
 void goToDegree(int degree) {
-  
-  if(degree >= MIN_ANGLE && degree <= MAX_ANGLE) {
-          
-    int realPosition, distance, factorOfOcilation;
+      int realPosition, distance, factorOfOcilation;
 
+  if(degree >= MIN_ANGLE && degree <= MAX_ANGLE) {
     realPosition = realMeanPosition();
     
-    while((realPosition < (degree - ERRO)) || (realPosition > (degree + ERRO))) {
-      digitalWrite(LED, LOW);
+    if((realPosition < (degree - ERRO)) ||
+           (realPosition > (degree + ERRO))) {
       distance = realPosition - degree;
       if(distance < 0)
         goClockWise(abs(distance));
@@ -223,8 +180,8 @@ void goToDegree(int degree) {
       realPosition = realMeanPosition();
     }
   }
-  digitalWrite(LED, HIGH);
-  motorStop();
+  if(realPosition == degree)
+    motorStop();
 }
 
 int newMap(int x, int in_min, int in_max, int out_min, int out_max) {
